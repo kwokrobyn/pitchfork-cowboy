@@ -1,92 +1,43 @@
-require('dotenv').config();
+require('dotenv').config()
+const { Telegraf } = require("telegraf")
+const ReviewHandler = require("./handlers/review")
 
-const express = require("express");
-const request_promise = require("request-promise");
-const $ = require("cheerio");
-const { Telegraf } = require("telegraf");
+const BOT_TOKEN = process.env.BOT_TOKEN || ""
 
-const { PullNewestReviews } = require("./integrations/pitchfork");
-const { getAlbumLink } = require("./integrations/spotify");
+const Bot = new Telegraf(BOT_TOKEN)
 
-const BOT_TOKEN = process.env.BOT_TOKEN || "";
+Bot.start(ctx => ctx.replyWithMarkdown("Welcome to the Fresh Cuts Bot.\n\n\
+Get the latest highly rated reviews from Pitchfork.com, straight to your phone.\n\n\
+To get started, use /show to see the latest review.\n\
+Use /feed to see the last 10 reviews.\n\
+Let me know what you think at @kwokrobyn. \n\n\
+Happy music discovering!"))
 
-const Bot = new Telegraf(BOT_TOKEN);
+Bot.command("show", async ctx => {
+  ReviewHandler.sendReview(ctx, 0)
+})
 
-let reviews = [];
+Bot.command("feed", async ctx => {
+  ReviewHandler.sendAllReviews(ctx)
+})
 
-Bot.start(ctx => ctx.replyWithMarkdown("Welcome to the Fresh Cuts Bot. "));
-
-Bot.hears("test", async ctx => {
-  await getAlbumLink("sheeran");
-});
-
-Bot.hears("hi", async ctx => {
-  sendReview(ctx, 0);
-});
+// Proxy for CRON job 
+Bot.hears("update", async ctx => {
+  ReviewHandler.pullReviews()
+  ctx.reply("updating reviews...")
+})
 
 Bot.on("callback_query", async ctx => {
-  const { callbackQuery } = ctx;
-  if (!callbackQuery) return;
-  const { data } = callbackQuery;
-  if (!data) return;
+  const { callbackQuery } = ctx
+  if (!callbackQuery) return
+  const { data } = callbackQuery
+  if (!data) return
   try {
-    sendReview(ctx, parseInt(data));
+    ReviewHandler.sendReview(ctx, parseInt(data))
   } catch (err) {
-    sendReview(ctx, parseInt(data + 1));
-  }
-});
-
-const sendReview = async (ctx, index) => {
-  if (reviews.length == 0) {
-    console.log("pulling reviews...")
-    const newReviews = await PullNewestReviews();
-    reviews = reviews.concat(newReviews);
-  }
-
-  const resolvedReviews = Promise.all(reviews);
-  const currentReview = (await resolvedReviews)[index];
-
-  const albumLink = await getAlbumLink(currentReview);
-
-  const maybeSpotifyLinkButton = albumLink
-    ? {
-        text: "Listen on Spotify",
-        url: albumLink || "www.placeholder.com",
-      }
-    : null;
-
-  const maybePreviousReviewButton =
-    index < reviews.length
-      ? {
-          text: "Previous",
-          callback_data: `${index + 1}`,
-        }
-      : null;
-
-  ctx.replyWithMarkdown(formatReviewMessage(currentReview), {
-    reply_markup: {
-      inline_keyboard: [
-        [
-          maybeSpotifyLinkButton,
-          maybePreviousReviewButton
-        ].filter(_ => _)
-      ]
+      console.log("error sending previous review: ", err.message)
+      await ReviewHandler.sendReview(ctx, parseInt(data + 1))
     }
-  });
-};
+})
 
-const formatReviewMessage = review => {
-    return `*Published on:* ${formatReleaseTime(review.pub_date)}\n*Genre:* ${
-      review.genre
-    }\n[Read on Pitchfork.com](${review.link})`;
-  };
-  
-  const formatReleaseTime = dateTime => {
-    const d = new Date(dateTime);
-    const options = { month: "long" };
-    return `${new Intl.DateTimeFormat("en-US", options).format(
-      d
-    )} ${d.getDate()}, ${d.getFullYear()}`;
-  };
-
-Bot.startPolling();
+Bot.startPolling()
