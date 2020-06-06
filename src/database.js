@@ -29,7 +29,7 @@ const addReviews = async (reviews) => {
     const lastExistingReview = await getLastReview()
     const lastExistingReviewId = lastExistingReview ? lastExistingReview._id : null
 
-    newReviews
+    await newReviews
         .reduce(async (prevId, review, i, _) => {
             console.log("last prevId: ", prevId)
             const newReview = await db.reviews.insert({
@@ -79,7 +79,7 @@ const garbageCollection = () => {
             // TODO: Implement this lmao 
         }
     })
-    .then(()=> db.reviews.persistence.compactDatafile)
+    .then(()=> db.reviews._original.persistence.compactDatafile)
 }
 
 /*
@@ -88,7 +88,7 @@ const garbageCollection = () => {
 const addUser = async (user) => {
     await db.users.remove({ userId: user.userId })
     await db.users.insert({...user, "subscriptions": {"pitchfork": true}})
-    .then(()=> db.users.persistence.compactDatafile)
+    .then(()=> db.users._original.persistence.compactDatafile)
     return user
 }
 
@@ -107,14 +107,14 @@ const getUser = async (query = {}) => {
 const subscribeUser = async (userId) => {
     db.users.update({ userId: userId }, { $set: { "subscriptions.pitchfork": true } })
     .catch(e => console.log("error subscribing user", e.message))
-    .then(()=> db.users.persistence.compactDatafile)
+    .then(()=> db.users._original.persistence.compactDatafile)
     
 }
 
 const unsubscribeUser = async (userId) => {
     db.users.update({ userId: userId }, { $set: { "subscriptions.pitchfork": false } })
         .catch(e => console.log("error unsubscribing user", e.message))
-        .then(()=> db.users.persistence.compactDatafile)
+        .then(()=> db.users._original.persistence.compactDatafile)
 }
 
 
