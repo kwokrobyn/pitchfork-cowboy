@@ -8,4 +8,4 @@ _/feed_ to see last 10 albums
 
 - currently sends albums rated 8.0 or better
 - sends updates at 9PM EST (9AM SGT)
-![tes][https://imgur.com/a/J8PpRvq]
+![tes](https://imgur.com/a/J8PpRvq)
