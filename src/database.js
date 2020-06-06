@@ -3,8 +3,8 @@ const { MAX_FEED_SIZE } = require("./config/constants")
 const Spotify = require("./integrations/spotify")
 
 const db = {
-    users: new Datastore({ filename: "./config/users.db", autoload: true }),
-    reviews: new Datastore({ filename: "./config/reviews.db", autoload: true }),
+    users: Datastore.create({ filename: "./config/users.db", autoload: true }),
+    reviews: Datastore.create({ filename: "./config/reviews.db", autoload: true }),
 }
 
 db.reviews.ensureIndex({
@@ -79,7 +79,7 @@ const garbageCollection = () => {
             // TODO: Implement this lmao 
         }
     })
-    .then(()=> db.reviews._original.persistence.compactDatafile)
+    .then(()=> db.reviews.persistence.compactDatafile)
 }
 
 /*
@@ -88,7 +88,7 @@ const garbageCollection = () => {
 const addUser = async (user) => {
     await db.users.remove({ userId: user.userId })
     await db.users.insert({...user, "subscriptions": {"pitchfork": true}})
-    .then(()=> db.users._original.persistence.compactDatafile)
+    .then(()=> db.users.persistence.compactDatafile)
     return user
 }
 
@@ -107,14 +107,14 @@ const getUser = async (query = {}) => {
 const subscribeUser = async (userId) => {
     db.users.update({ userId: userId }, { $set: { "subscriptions.pitchfork": true } })
     .catch(e => console.log("error subscribing user", e.message))
-    .then(()=> db.users._original.persistence.compactDatafile)
+    .then(()=> db.users.persistence.compactDatafile)
     
 }
 
 const unsubscribeUser = async (userId) => {
     db.users.update({ userId: userId }, { $set: { "subscriptions.pitchfork": false } })
         .catch(e => console.log("error unsubscribing user", e.message))
-        .then(()=> db.users._original.persistence.compactDatafile)
+        .then(()=> db.users.persistence.compactDatafile)
 }
 
 
