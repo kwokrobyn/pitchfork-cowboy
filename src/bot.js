@@ -20,7 +20,9 @@ Bot.command("show", async ctx => {
 })
 
 Bot.command("test", async ctx => {
-  console.log(await db.getUsers())
+  if (ctx.from.id == ADMIN_ID) {
+    ctx.reply(await db.getUsers())
+  }
 })
 
 Bot.command("feed", async ctx => {
@@ -71,7 +73,7 @@ Bot.on("callback_query", async ctx => {
 
 Bot.startPolling()
 
-// every day at 9am and 6pm 
+// every day at 9am
 cron.schedule("0 9 * * *", () => {
   Bot.telegram.sendMessage(ADMIN_ID, "running cron job...")
   sendUpdates()

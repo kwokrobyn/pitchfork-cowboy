@@ -1,3 +1,5 @@
 node_modules/
 .env
 key_pair_0.pem
+config/reviews.db
+config/users.db
