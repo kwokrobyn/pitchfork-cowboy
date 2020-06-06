@@ -8,6 +8,7 @@ const pullReviews = async () => {
 
 const sendAllReviews = async (ctx) => {
     const reviews = await db.getReviews()
+    reviews.sort((a, b) => (a.pub_date > b.pub_date) ? 1 : -1)
     for (let i = 0; i < Math.min(10, reviews.length); i++) {
         await sendReview(ctx.chat.id, ctx.telegram, reviews[i]._id, false);
     }
