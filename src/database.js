@@ -1,5 +1,6 @@
 const Datastore = require("nedb-promises")
 const { MAX_FEED_SIZE } = require("./config/constants")
+const Spotify = require("./integrations/spotify")
 
 const db = {
     users: new Datastore({ filename: "./config/users.db", autoload: true }),
@@ -10,41 +11,33 @@ db.reviews.ensureIndex({
     fieldName: "pub_date"
 })
 
+db.users.update({}, { $set: { "subscriptions.pitchfork": true } })
+
 /*
 *  REVIEWS 
 */
 const addReviews = async (reviews) => {
-
     // filter out reviews if they already exist 
     const newReviews = await filter(reviews, async review => {
-        return (await countReviews({hash : review.hash}) == 0)
+        return (await countReviews({ hash: review.hash }) == 0)
     })
 
     // sort reviews by pub_date 
     newReviews.sort((a, b) => (a.pub_date > b.pub_date) ? 1 : -1)
     console.log("new reviews: " + newReviews.map(review => review.pub_date + " "))
 
-    // newReviews
-    //     .map(async review => {
-
-    //         const lastReview = await getLastReview()
-    //         let prevId
-    //         if (lastReview == null) prevId = null
-    //         else prevId = lastReview._id
-    //         db.reviews.insert({...review, prev: prevId})
-    //         .catch(e => console.log("error adding reviews", e.message))
-    //     })
-
-    // the first review will not have a prevId, so call getLastReview to get id
-
-    const lastExistingReview = await getLastReview() 
-    const lastExistingReviewId = lastExistingReview ? lastExistingReview._id : null 
+    const lastExistingReview = await getLastReview()
+    const lastExistingReviewId = lastExistingReview ? lastExistingReview._id : null
 
     newReviews
-        .reduce( async (prevId, review, i, _) => {
+        .reduce(async (prevId, review, i, _) => {
             console.log("last prevId: ", prevId)
-            const newReview = await db.reviews.insert({...review, prev: await prevId})
-            .catch(e => console.log("error adding reviews", e.message))
+            const newReview = await db.reviews.insert({
+                 ...review, 
+                 prev: await prevId, 
+                 spotifyUrl: await Spotify.getAlbumLink(review)
+                })
+                .catch(e => console.log("error adding reviews", e.message))
             console.log("review just added", newReview)
             return newReview._id
         }, lastExistingReviewId)
@@ -76,7 +69,7 @@ const getReview = async (query = {}) => {
 
 const countReviews = async (query = {}) => {
     const count = await db.reviews.count(query)
-    return count 
+    return count
 }
 
 const garbageCollection = () => {
@@ -84,38 +77,62 @@ const garbageCollection = () => {
         if (err) console.log("db: failed to count")
         if (count > MAX_FEED_SIZE) {
             // TODO: Implement this lmao 
-        } 
+        }
     })
+    .then(()=> db.reviews.persistence.compactDatafile)
 }
 
 /*
 *  USERS 
 */
 const addUser = async (user) => {
-    await db.users.remove({ userId : user.userId })
-    await db.users.insert(user)
+    await db.users.remove({ userId: user.userId })
+    await db.users.insert({...user, "subscriptions": {"pitchfork": true}})
+    .then(()=> db.users.persistence.compactDatafile)
     return user
 }
 
-const getUsers = async () => {
-    const result = await db.users.find()
+const getUsers = async (query = {}) => {
+    const result = await db.users.find(query)
         .catch(e => console.log("error getting users", e.message))
     return result
+}
+
+const getUser = async (query = {}) => {
+    const result = await db.users.findOne(query)
+        .catch(e => console.log("error getting users", e.message))
+    return result
+}
+
+const subscribeUser = async (userId) => {
+    db.users.update({ userId: userId }, { $set: { "subscriptions.pitchfork": true } })
+    .catch(e => console.log("error subscribing user", e.message))
+    .then(()=> db.users.persistence.compactDatafile)
+    
+}
+
+const unsubscribeUser = async (userId) => {
+    db.users.update({ userId: userId }, { $set: { "subscriptions.pitchfork": false } })
+        .catch(e => console.log("error unsubscribing user", e.message))
+        .then(()=> db.users.persistence.compactDatafile)
 }
 
 
 async function filter(arr, callback) {
     const fail = Symbol()
-    return (await Promise.all(arr.map(async item => (await callback(item)) ? item : fail))).filter(i=>i!==fail)
-  }
+    return (await Promise.all(arr.map(async item => (await callback(item)) ? item : fail))).filter(i => i !== fail)
+}
 
 module.exports = {
-    addReviews, 
+    addReviews,
     getReviews,
     countReviews,
     addUser,
+    getUser,
     getUsers,
     getReview,
-    getLastReview
+    getLastReview,
+    subscribeUser,
+    unsubscribeUser
 }
 

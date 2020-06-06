@@ -1,6 +1,5 @@
 const db = require("./../database")
 const { pullNewestReviews } = require("./../integrations/pitchfork")
-const { getAlbumLink } = require("./../integrations/spotify")
 
 const pullReviews = async () => {
     const newReviews = await pullNewestReviews()
@@ -10,22 +9,21 @@ const pullReviews = async () => {
 const sendAllReviews = async (ctx) => {
     const reviews = await db.getReviews()
     for (let i = 0; i < Math.min(10, reviews.length); i++) {
-        await sendReview(ctx, i, false);
+        await sendReview(ctx.chat.id, ctx.telegram, reviews[i]._id, false);
     }
 }
 
-const sendReview = async (ctx = null, reviewId = null, chatId = null, showPrevious = true, cb = null) => {
-
+const sendReview = async (recipient, bot, reviewId = null, showPrevious = true) => {
     // if no review, send last review
     const currentReview = reviewId ? await db.getReview({_id: reviewId}) : await db.getLastReview()
+    bot.sendMessage(recipient, ...formatReview(currentReview, showPrevious, true))
+}
 
-    const recipientChat = chatId ? chatId : ctx.chat.id
-    const albumLink = await getAlbumLink(currentReview)
-
-    const maybeSpotifyLinkButton = albumLink
+const formatReview = (currentReview, showPrevious, showSpotify) => {
+    const maybeSpotifyLinkButton = currentReview.spotifyUrl && showSpotify
         ? {
             text: "Listen on Spotify",
-            url: albumLink || "www.placeholder.com",
+            url: currentReview.spotifyUrl || "www.placeholder.com",
         }
         : null
 
@@ -37,11 +35,7 @@ const sendReview = async (ctx = null, reviewId = null, chatId = null, showPrevio
             }
             : null
 
-    const t = cb ? cb : (ctx ? ctx.telegram : null)
-
-    t.sendMessage(
-        recipientChat, 
-        formatReviewMessage(currentReview), {
+    return [formatReviewMessage(currentReview), {
             parse_mode: "Markdown",
             reply_markup: JSON.stringify({
                 inline_keyboard: [
@@ -51,8 +45,7 @@ const sendReview = async (ctx = null, reviewId = null, chatId = null, showPrevio
                     ].filter(_ => _)
                 ]
             }) 
-        }
-    )
+        }]
 }
 
 const formatReviewMessage = review => {

@@ -1,31 +1,37 @@
 require('dotenv').config()
 const { Telegraf } = require("telegraf")
+const { WELCOME_TEXT, FEED_TEXT, SUBSCRIBE_TEXT, UNSUBSCRIBE_TEXT } = require("./config/constants")
 const ReviewHandler = require("./handlers/review")
 const db = require("./database")
 const cron = require("node-cron")
 
 const BOT_TOKEN = process.env.BOT_TOKEN || ""
+const ADMIN_ID = process.env.ADMIN_ID
 
 const Bot = new Telegraf(BOT_TOKEN)
 
 Bot.start(ctx => {
-
   db.addUser({ chatId: ctx.chat.id, userId: ctx.from.id })
-
-  ctx.replyWithMarkdown("Welcome to the Fresh Cuts Bot.\n\n\
-Get the latest highly rated reviews from Pitchfork.com, straight to your phone.\n\n\
-To get started, use /show to see the latest review.\n\
-Use /feed to see the last 10 reviews.\n\
-Let me know what you think at @kwokrobyn. \n\n\
-Happy music discovering!")
+  ctx.replyWithMarkdown(WELCOME_TEXT)
 })
 
 Bot.command("show", async ctx => {
-  ReviewHandler.sendReview(ctx)
+  ReviewHandler.sendReview(ctx.chat.id, ctx.telegram)
 })
 
 Bot.command("feed", async ctx => {
+  ctx.replyWithMarkdown(FEED_TEXT)
   ReviewHandler.sendAllReviews(ctx)
+})
+
+Bot.command("subscribe", async ctx => {
+  ctx.replyWithMarkdown(SUBSCRIBE_TEXT)
+  await db.subscribeUser(ctx.from.id)
+})
+
+Bot.command("unsubscribe", async ctx => {
+  ctx.replyWithMarkdown(UNSUBSCRIBE_TEXT)
+  await db.unsubscribeUser(ctx.from.id)
 })
 
 // Proxy for CRON job 
@@ -39,7 +45,9 @@ const sendUpdates = async () => {
   if (newReviews && newReviews.length > 0) {
     const userArray = await db.getUsers()
     userArray.map(user => {
-        ReviewHandler.sendReview(ctx = null, reviewId = null, userId = user.chatId, showPrevious = true, cb = Bot.telegram)
+        // only send notification if user is subscribed
+        if (!user.subscriptions.pitchfork) return
+        ReviewHandler.sendReview(user.chatId, Bot.telegram, undefined, true)
     })
   }
 }
@@ -50,18 +58,18 @@ Bot.on("callback_query", async ctx => {
   const { data } = callbackQuery
   if (!data) return
   try {
-    ReviewHandler.sendReview(ctx, data)
+    ReviewHandler.sendReview(ctx.chat.id, ctx.telegram, data)
   } catch (err) {
       console.log("error sending previous review: ", err.message)
-      await ReviewHandler.sendReview(ctx)
+      await ReviewHandler.sendReview(ctx.chat.id, ctx.telegram)
     }
 })
 
 Bot.startPolling()
 
-// every day at 9am
-cron.schedule("22 13 * * *", () => {
-  Bot.telegram.sendMessage(758907078, "running cron job...")
+// every day at 9am and 6pm 
+cron.schedule("0 9 * * *", () => {
+  Bot.telegram.sendMessage(ADMIN_ID, "running cron job...")
   sendUpdates()
 }, {
   timezone: "Asia/Kuala_Lumpur"

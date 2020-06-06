@@ -2,6 +2,7 @@ const request_promise = require("request-promise")
 const md5 = require("md5")
 const $ = require("cheerio")
 
+const MAIN = "/reviews/albums/?page="
 const PLUS = "/best/high-scoring-albums/?page="
 const PITCHFORK_URL = "https://pitchfork.com"
 
