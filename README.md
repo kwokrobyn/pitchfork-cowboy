@@ -1,5 +1,6 @@
 ## Pitchfork Cowboy 🤠
 Receives daily updates from pitchfork.com when there's a new album listed
+
 Links directly to spotify
 
 ![](/assets/post.png)
