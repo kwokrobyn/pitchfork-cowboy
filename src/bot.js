@@ -19,6 +19,10 @@ Bot.command("show", async ctx => {
   ReviewHandler.sendReview(ctx.chat.id, ctx.telegram)
 })
 
+Bot.command("test", async ctx => {
+  console.log(await db.getUsers())
+})
+
 Bot.command("feed", async ctx => {
   ctx.replyWithMarkdown(FEED_TEXT)
   ReviewHandler.sendAllReviews(ctx)
@@ -44,6 +48,7 @@ const sendUpdates = async () => {
   const newReviews = await ReviewHandler.pullReviews()
   if (newReviews && newReviews.length > 0) {
     const userArray = await db.getUsers()
+    console.log("userarray: ",userArray.length)
     userArray.map(user => {
         // only send notification if user is subscribed
         if (!user.subscriptions.pitchfork) return

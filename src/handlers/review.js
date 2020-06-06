@@ -1,4 +1,5 @@
 const db = require("./../database")
+const Promise = require("bluebird")
 const { pullNewestReviews } = require("./../integrations/pitchfork")
 
 const pullReviews = async () => {
@@ -9,15 +10,19 @@ const pullReviews = async () => {
 const sendAllReviews = async (ctx) => {
     const reviews = await db.getReviews()
     reviews.sort((a, b) => (a.pub_date > b.pub_date) ? 1 : -1)
-    for (let i = 0; i < Math.min(10, reviews.length); i++) {
-        await sendReview(ctx.chat.id, ctx.telegram, reviews[i]._id, false);
-    }
+
+    console.log(reviews.map(review => review.artist))
+
+    Promise.mapSeries(reviews, (review) => {
+        return sendReview(ctx.chat.id, ctx.telegram, review._id, false);
+    })
 }
 
 const sendReview = async (recipient, bot, reviewId = null, showPrevious = true) => {
     // if no review, send last review
     const currentReview = reviewId ? await db.getReview({_id: reviewId}) : await db.getLastReview()
-    bot.sendMessage(recipient, ...formatReview(currentReview, showPrevious, true))
+    await bot.sendMessage(recipient, ...formatReview(currentReview, showPrevious, true))
+    return
 }
 
 const formatReview = (currentReview, showPrevious, showSpotify) => {
