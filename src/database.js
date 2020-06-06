@@ -11,8 +11,6 @@ db.reviews.ensureIndex({
     fieldName: "pub_date"
 })
 
-db.users.update({}, { $set: { "subscriptions.pitchfork": true } })
-
 /*
 *  REVIEWS 
 */
@@ -24,21 +22,18 @@ const addReviews = async (reviews) => {
 
     // sort reviews by pub_date 
     newReviews.sort((a, b) => (a.pub_date > b.pub_date) ? 1 : -1)
-    console.log("new reviews: " + newReviews.map(review => review.pub_date + " "))
 
     const lastExistingReview = await getLastReview()
     const lastExistingReviewId = lastExistingReview ? lastExistingReview._id : null
 
     await newReviews
         .reduce(async (prevId, review, i, _) => {
-            console.log("last prevId: ", prevId)
             const newReview = await db.reviews.insert({
                  ...review, 
                  prev: await prevId, 
                  spotifyUrl: await Spotify.getAlbumLink(review)
                 })
                 .catch(e => console.log("error adding reviews", e.message))
-            console.log("review just added", newReview)
             return newReview._id
         }, lastExistingReviewId)
 
@@ -51,20 +46,18 @@ const getLastReview = async () => {
     return last
 }
 
-//db.reviews.remove({})
+const getReview = async (query = {}) => {
+    const review = await db.reviews.findOne(query)
+        .catch(e => console.log("error getting review", e.message))
+
+    return review
+}
 
 const getReviews = async (query = {}) => {
     const results = await db.reviews.find(query).sort({ pub_date: -1 })
         .catch(e => console.log("error getting reviews", e.message))
 
     return results
-}
-
-const getReview = async (query = {}) => {
-    const review = await db.reviews.findOne(query)
-        .catch(e => console.log("error getting reviews", e.message))
-
-    return review
 }
 
 const countReviews = async (query = {}) => {
