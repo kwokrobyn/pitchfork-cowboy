@@ -1,31 +1,25 @@
-const { addReviews, countReviews, getReviews } = require("./../database")
+const db = require("./../database")
 const { pullNewestReviews } = require("./../integrations/pitchfork")
 const { getAlbumLink } = require("./../integrations/spotify")
 
 const pullReviews = async () => {
     const newReviews = await pullNewestReviews()
-    addReviews(newReviews)
+    return db.addReviews(newReviews)
 }
 
 const sendAllReviews = async (ctx) => {
-    const reviews = await getReviews()
+    const reviews = await db.getReviews()
     for (let i = 0; i < Math.min(10, reviews.length); i++) {
         await sendReview(ctx, i, false);
     }
 }
 
-const sendReview = async (ctx, index, showPrevious = true) => {
-    const reviews = await getReviews()
-    if (reviews.length == 0) return
+const sendReview = async (ctx = null, reviewId = null, chatId = null, showPrevious = true, cb = null) => {
 
-    const currentReview = reviews[index]
+    // if no review, send last review
+    const currentReview = reviewId ? await db.getReview({_id: reviewId}) : await db.getLastReview()
 
-    ctx.replyWithMarkdown(formatReviewMessage(currentReview), {
-        reply_markup: await generateReplyMarkup(currentReview, index, showPrevious)
-    })
-}
-
-const generateReplyMarkup = async (currentReview, index, showPrevious) => {
+    const recipientChat = chatId ? chatId : ctx.chat.id
     const albumLink = await getAlbumLink(currentReview)
 
     const maybeSpotifyLinkButton = albumLink
@@ -36,21 +30,29 @@ const generateReplyMarkup = async (currentReview, index, showPrevious) => {
         : null
 
     const maybePreviousReviewButton =
-        index < await countReviews() && showPrevious
+        currentReview.prev && showPrevious
             ? {
                 text: "Previous",
-                callback_data: `${index + 1}`,
+                callback_data: `${currentReview.prev}`,
             }
             : null
 
-    return {
-        inline_keyboard: [
-            [
-                maybeSpotifyLinkButton,
-                maybePreviousReviewButton
-            ].filter(_ => _)
-        ]
-    }
+    const t = cb ? cb : (ctx ? ctx.telegram : null)
+
+    t.sendMessage(
+        recipientChat, 
+        formatReviewMessage(currentReview), {
+            parse_mode: "Markdown",
+            reply_markup: JSON.stringify({
+                inline_keyboard: [
+                    [
+                        maybeSpotifyLinkButton,
+                        maybePreviousReviewButton
+                    ].filter(_ => _)
+                ]
+            }) 
+        }
+    )
 }
 
 const formatReviewMessage = review => {
@@ -69,8 +71,7 @@ const formatReleaseTime = dateTime => {
 
 
 module.exports = {
-    pullReviews,
+    pullReviews, 
     sendReview,
-    sendAllReviews,
-    generateReplyMarkup
+    sendAllReviews
 }

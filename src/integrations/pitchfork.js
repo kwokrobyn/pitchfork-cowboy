@@ -7,7 +7,7 @@ const PITCHFORK_URL = "https://pitchfork.com"
 
 const pullNewestReviews = async () => {
   try {
-    const res = await request_promise(PITCHFORK_URL + PLUS + 1)
+    const res = await request_promise(PITCHFORK_URL + PLUS + "1")
     const htmlBody = $(".review__link", res)
     const hrefList = Array(htmlBody.length)
         .fill(1)
@@ -42,7 +42,7 @@ const queryReviews = async (hrefList) => {
         hash: md5(artist + album + pub_date)
       }
     } catch (err) {
-      console.log("error while querying reviews", err)
+      console.log("error while querying reviews", err.message)
     }
   }))
 }
