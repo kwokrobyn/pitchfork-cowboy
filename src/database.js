@@ -24,6 +24,7 @@ const addReviews = async (reviews) => {
     newReviews.sort((a, b) => (a.pub_date > b.pub_date) ? 1 : -1)
     console.log("new reviews: " + newReviews.map(review => review.pub_date + " "))
     
+    // the first review will not have a prevId, so call getLastReview to get id
     newReviews
         .reduce( async (prevId, review, i, _) => {
             console.log("last prevId: ", prevId)
@@ -31,7 +32,7 @@ const addReviews = async (reviews) => {
             .catch(e => console.log("error adding reviews", e.message))
             console.log("review just added", newReview)
             return newReview._id
-        }, null)
+        }, (await getLastReview())._id)
 
     garbageCollection()
     return newReviews
