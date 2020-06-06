@@ -60,7 +60,7 @@ Bot.on("callback_query", async ctx => {
 Bot.startPolling()
 
 // every day at 9am
-cron.schedule("20 13 * * *", () => {
+cron.schedule("22 13 * * *", () => {
   Bot.telegram.sendMessage(758907078, "running cron job...")
   sendUpdates()
 }, {
