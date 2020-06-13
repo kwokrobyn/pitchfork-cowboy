@@ -64,7 +64,7 @@ Bot.command("set", async ctx => {
   let newScoreNum
   try {
     newScoreNum = parseFloat(newScore)
-  } catch {
+  } catch(e) {
     ctx.replyWithMarkdown(INVALID_SET_TEXT)
   } 
 
