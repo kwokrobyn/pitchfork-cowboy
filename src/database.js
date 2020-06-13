@@ -44,17 +44,34 @@ const addReviews = async (reviews) => {
 }
 
 const getReviewsWithMinScore = async (minScore, limit) => {
-    const results = await getReviews({score: { $gte: minScore }})
+    const results = await getReviews({score: { $gte: minScore }}, limit)
     return results
 }
 
+const getLastReviewWithMinScore = async (minScore, date, dateOrder) => {
+// Find the most recent review with the qualifying min score
+
+    if (!date && !dateOrder) {
+        return getLastReview({score: {$gte: minScore}})
+    }
+
+    let maybeSameDayResult
+    if (dateOrder > 0) {
+        maybeSameDayResult = await db.reviews.findOne({ score: {  $gte: minScore }, pub_date: date, pub_date_order: { $lt: dateOrder } }).sort({ pub_date_order: -1 }).limit(1)
+    }
+    if (maybeSameDayResult) return maybeSameDayResult
+    const res = await db.reviews.findOne({ score: { $gte: minScore }, pub_date: {  $lt: date } }).sort({ pub_date: -1, pub_date_order: -1 }).limit(1)
+    return res
+} 
+
 const numSameDay = async (date) => {
     const count = await db.reviews.count({pub_date: date})
+    console.log(count)
     return count
 }
 
-const getLastReview = async () => {
-    const last = await db.reviews.findOne({}).sort({ pub_date: -1 }).limit(1)
+const getLastReview = async (query = {}) => {
+    const last = await db.reviews.findOne(query).sort({ pub_date: -1 , pub_date_order: -1})
     return last
 }
 
@@ -90,7 +107,7 @@ const garbageCollection = () => {
 */
 const addUser = async (user) => {
     await db.users.remove({ userId: user.userId })
-    await db.users.insert({...user, "subscriptions": {"pitchfork": true}})
+    await db.users.insert({...user, "subscriptions": {"pitchfork": true}, "minScore": 5.0})
     .then(()=> db.users.persistence.compactDatafile)
     return user
 }
@@ -120,6 +137,17 @@ const unsubscribeUser = async (userId) => {
         .then(()=> db.users.persistence.compactDatafile)
 }
 
+const getMinScoreOfUser = async (userId) => {
+    return (await getUser({userId : userId})).minScore
+}
+
+const setMinScoreOfUser = async (minScore, userId) => {
+    await db.users.update({ userId: userId }, { $set: { minScore: parseFloat(minScore) } })
+        .catch(e => console.log("error setting minScore of user", e.message))
+        .then(()=> db.users.persistence.compactDatafile)
+    return minScore
+}
+
 /*
 * HELPERS
 */
@@ -131,6 +159,8 @@ async function filter(arr, callback) {
 module.exports = {
     addReviews,
     getReviews,
+    getReviewsWithMinScore,
+    getLastReviewWithMinScore,
     countReviews,
     addUser,
     getUser,
@@ -138,6 +168,8 @@ module.exports = {
     getReview,
     getLastReview,
     subscribeUser,
-    unsubscribeUser
+    unsubscribeUser,
+    getMinScoreOfUser,
+    setMinScoreOfUser
 }
 

@@ -6,9 +6,9 @@ const MAIN = "/reviews/albums/?page="
 const PLUS = "/best/high-scoring-albums/?page="
 const PITCHFORK_URL = "https://pitchfork.com"
 
-const pullNewestReviews = async () => {
+const pullNewestReviews = async (page) => {
   try {
-    const res = await request_promise(PITCHFORK_URL + PLUS + "1")
+    const res = await request_promise(PITCHFORK_URL + MAIN + page)
     const htmlBody = $(".review__link", res)
     const hrefList = Array(htmlBody.length)
         .fill(1)

@@ -1,53 +1,72 @@
 const db = require("./../database")
 const Promise = require("bluebird")
+const { NO_REVIEW_FOUND_TEXT, FEED_TEXT } = require("../config/constants")
 const { pullNewestReviews } = require("./../integrations/pitchfork")
 
-const pullReviews = async () => {
-    const newReviews = await pullNewestReviews()
+const pullReviews = async (page) => {
+    const newReviews = await pullNewestReviews(page)
     return db.addReviews(newReviews)
 }
 
-// TODO: add a limit
-const sendAllReviews = async (ctx) => {
-    const reviews = await db.getReviews()
-    Promise.mapSeries(reviews, (review) => {
-        return sendReview(ctx.chat.id, ctx.telegram, review._id, false);
+const sendAllReviews = async (recipient, bot, limit) => {
+    const minScore = await db.getMinScoreOfUser(recipient)
+    const reviews = await db.getReviewsWithMinScore(minScore, limit)
+    if (reviews.length == 0) {
+        bot.sendMessage(recipient, NO_REVIEW_FOUND_TEXT)
+    }
+    Promise.mapSeries(reviews.reverse(), (review) => {
+        return sendReview(recipient, bot, review._id, false);
     })
 }
 
 const sendReview = async (recipient, bot, reviewId = null, showPrevious = true) => {
+    const minScore = await db.getMinScoreOfUser(recipient)
+
     // if no review, send last review
-    const currentReview = reviewId ? await db.getReview({_id: reviewId}) : await db.getLastReview()
-    await bot.sendMessage(recipient, ...formatReview(currentReview, showPrevious, true))
+    const currentReview = reviewId ?
+        await db.getReview({ _id: reviewId }) :
+        await db.getLastReviewWithMinScore(minScore)
+    if (!currentReview) bot.sendMessage(recipient, NO_REVIEW_FOUND_TEXT) // TODO: polish
+    else await bot.sendMessage(recipient, ...await formatReview(currentReview, showPrevious, showSpotify = true, minScore))
 }
 
-const formatReview = (currentReview, showPrevious, showSpotify) => {
+const formatReview = async (currentReview, showPrevious, showSpotify, minScore) => {
     const maybeSpotifyLinkButton = currentReview.spotifyUrl && showSpotify
         ? {
             text: "Listen on Spotify",
             url: currentReview.spotifyUrl || "www.placeholder.com",
         }
         : null
-
+    
+    let maybePreviousReviewButtonData = null
+    if (showPrevious) {
+        const lastReview = await db.getLastReviewWithMinScore(
+            minScore, 
+            currentReview.pub_date, 
+            currentReview.pub_date_order
+        )
+        maybePreviousReviewButtonData = lastReview ? lastReview._id : null
+    }
+    
     const maybePreviousReviewButton =
-        currentReview.prev && showPrevious
-            ? {
+        maybePreviousReviewButtonData ? 
+            {
                 text: "Previous",
-                callback_data: `${currentReview.prev}`,
+                callback_data: `${maybePreviousReviewButtonData}`,
             }
             : null
 
     return [formatReviewMessage(currentReview), {
-            parse_mode: "Markdown",
-            reply_markup: JSON.stringify({
-                inline_keyboard: [
-                    [
-                        maybeSpotifyLinkButton,
-                        maybePreviousReviewButton
-                    ].filter(_ => _)
-                ]
-            }) 
-        }]
+        parse_mode: "Markdown",
+        reply_markup: JSON.stringify({
+            inline_keyboard: [
+                [
+                    maybeSpotifyLinkButton,
+                    maybePreviousReviewButton
+                ].filter(_ => _)
+            ]
+        })
+    }]
 }
 
 const formatReviewMessage = review => {
@@ -66,7 +85,7 @@ const formatReleaseTime = dateTime => {
 
 
 module.exports = {
-    pullReviews, 
+    pullReviews,
     sendReview,
     sendAllReviews
 }
