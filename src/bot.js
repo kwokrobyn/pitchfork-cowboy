@@ -6,7 +6,7 @@ const db = require("./database")
 const cron = require("node-cron")
 
 const BOT_TOKEN = process.env.BOT_TOKEN || ""
-const ADMIN_ID = process.env.ADMIN_ID
+const ADMIN_ID = parseInt(process.env.ADMIN_ID)
 
 const Bot = new Telegraf(BOT_TOKEN)
 
@@ -42,8 +42,10 @@ Bot.command("unsubscribe", async ctx => {
 
 // Proxy for CRON job 
 Bot.hears("update", async ctx => {
-  ctx.reply("simulate cron, updating reviews...")
-  await sendUpdates()
+  if (ctx.from.id == ADMIN_ID) {
+    ctx.reply("simulate cron, updating reviews...")
+    await sendUpdates()
+  }
 })
 
 const sendUpdates = async () => {

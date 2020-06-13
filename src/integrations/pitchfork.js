@@ -36,7 +36,7 @@ const queryReviews = async (hrefList) => {
         author: $(".authors-detail__display-name", htmlBody).text(),
         pub_date: pub_date,
         genre: $(".genre-list__link", htmlBody).text(),
-        score: $(".score", res).text(),
+        score: parseFloat($(".score", res).first().text()),
         img: $('meta[property="og:image"]', res)[0].attribs.content,
         preview: $('.review-detail__abstract', res).text(),
         link: PITCHFORK_URL + href, 

@@ -7,6 +7,7 @@ const pullReviews = async () => {
     return db.addReviews(newReviews)
 }
 
+// TODO: add a limit
 const sendAllReviews = async (ctx) => {
     const reviews = await db.getReviews()
     Promise.mapSeries(reviews, (review) => {

@@ -20,6 +20,7 @@ const addReviews = async (reviews) => {
         return (await countReviews({ hash: review.hash }) == 0)
     })
 
+    console.log("new reviews count: " + newReviews.length)
     // sort reviews by pub_date 
     newReviews.sort((a, b) => (a.pub_date > b.pub_date) ? 1 : -1)
 
@@ -31,6 +32,7 @@ const addReviews = async (reviews) => {
             const newReview = await db.reviews.insert({
                  ...review, 
                  prev: await prevId, 
+                 pub_date_order: await numSameDay(review.pub_date),
                  spotifyUrl: await Spotify.getAlbumLink(review)
                 })
                 .catch(e => console.log("error adding reviews", e.message))
@@ -41,6 +43,16 @@ const addReviews = async (reviews) => {
     return newReviews
 }
 
+const getReviewsWithMinScore = async (minScore, limit) => {
+    const results = await getReviews({score: { $gte: minScore }})
+    return results
+}
+
+const numSameDay = async (date) => {
+    const count = await db.reviews.count({pub_date: date})
+    return count
+}
+
 const getLastReview = async () => {
     const last = await db.reviews.findOne({}).sort({ pub_date: -1 }).limit(1)
     return last
@@ -49,14 +61,12 @@ const getLastReview = async () => {
 const getReview = async (query = {}) => {
     const review = await db.reviews.findOne(query)
         .catch(e => console.log("error getting review", e.message))
-
     return review
 }
 
-const getReviews = async (query = {}) => {
-    const results = await db.reviews.find(query).sort({ pub_date: -1 })
+const getReviews = async (query = {}, limit = 10) => {
+    const results = await db.reviews.find(query).sort({ pub_date: -1 }).limit(limit)
         .catch(e => console.log("error getting reviews", e.message))
-
     return results
 }
 
@@ -110,7 +120,9 @@ const unsubscribeUser = async (userId) => {
         .then(()=> db.users.persistence.compactDatafile)
 }
 
-
+/*
+* HELPERS
+*/
 async function filter(arr, callback) {
     const fail = Symbol()
     return (await Promise.all(arr.map(async item => (await callback(item)) ? item : fail))).filter(i => i !== fail)
